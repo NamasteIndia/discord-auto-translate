@@ -1,0 +1,25 @@
+services:
+  - name: discord-translate-bot
+    type: web
+    instance_type: nano
+    regions:
+      - was
+    env:
+      - name: DISCORD_TOKEN
+        secret: discord-token
+      - name: LIBRETRANSLATE_URL
+        value: https://libretranslate.com/translate
+      - name: PORT
+        value: "8080"
+    ports:
+      - port: 8080
+        protocol: http
+    health_checks:
+      - path: /health
+        port: 8080
+        protocol: http
+        interval: 60
+        timeout: 5
+        grace_period: 120
+    docker:
+      dockerfile: Dockerfile
