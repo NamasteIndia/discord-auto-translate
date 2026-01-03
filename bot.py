@@ -11,13 +11,12 @@ from aiohttp import web
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
-LIBRE_URL = os.getenv("LIBRETRANSLATE_URL", "https://libretranslate.com/translate")
 PORT = int(os.getenv("PORT", 8080))
 
 if not TOKEN:
     raise RuntimeError("DISCORD_TOKEN missing")
 
-LIBRE_BASE = LIBRE_URL.replace("/translate", "")
+print(f"🌐 Using Google Translate (unofficial API)")
 
 # ---------------- BOT SETUP ----------------
 intents = discord.Intents.default()
@@ -57,54 +56,84 @@ async def start_health_server():
 
 # ---------------- LOAD LANGUAGES ----------------
 async def load_languages():
-    max_retries = 5
-    retry_delay = 5
+    """Load supported languages for Google Translate"""
+    global LANGUAGES
     
-    for attempt in range(max_retries):
-        try:
-            async with http_session.get(
-                f"{LIBRE_BASE}/languages", 
-                timeout=aiohttp.ClientTimeout(total=15)
-            ) as r:
-                data = await r.json()
-                for lang in data:
-                    LANGUAGES[lang["name"]] = lang["code"]
-                print(f"✅ Loaded {len(LANGUAGES)} languages")
-                return
-        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-            if attempt < max_retries - 1:
-                print(f"⚠️ Failed to load languages (attempt {attempt + 1}/{max_retries}): {e}")
-                print(f"   Retrying in {retry_delay} seconds...")
-                await asyncio.sleep(retry_delay)
-            else:
-                print(f"❌ Could not connect to LibreTranslate after {max_retries} attempts")
-                print(f"   Using public LibreTranslate instance")
-                # Load a basic set of languages as fallback
-                LANGUAGES.update({
-                    "English": "en", "Spanish": "es", "French": "fr",
-                    "German": "de", "Italian": "it", "Portuguese": "pt",
-                    "Russian": "ru", "Japanese": "ja", "Chinese": "zh",
-                    "Korean": "ko", "Arabic": "ar", "Hindi": "hi"
-                })
+    # Google Translate supported languages
+    LANGUAGES = {
+        "Afrikaans": "af", "Albanian": "sq", "Amharic": "am", "Arabic": "ar",
+        "Armenian": "hy", "Azerbaijani": "az", "Basque": "eu", "Belarusian": "be",
+        "Bengali": "bn", "Bosnian": "bs", "Bulgarian": "bg", "Catalan": "ca",
+        "Cebuano": "ceb", "Chinese": "zh", "Corsican": "co", "Croatian": "hr",
+        "Czech": "cs", "Danish": "da", "Dutch": "nl", "English": "en",
+        "Esperanto": "eo", "Estonian": "et", "Finnish": "fi", "French": "fr",
+        "Galician": "gl", "Georgian": "ka", "German": "de", "Greek": "el",
+        "Gujarati": "gu", "Haitian Creole": "ht", "Hausa": "ha", "Hawaiian": "haw",
+        "Hebrew": "he", "Hindi": "hi", "Hmong": "hmn", "Hungarian": "hu",
+        "Icelandic": "is", "Igbo": "ig", "Indonesian": "id", "Irish": "ga",
+        "Italian": "it", "Japanese": "ja", "Javanese": "jv", "Kannada": "kn",
+        "Kazakh": "kk", "Khmer": "km", "Korean": "ko", "Kurdish": "ku",
+        "Kyrgyz": "ky", "Lao": "lo", "Latin": "la", "Latvian": "lv",
+        "Lithuanian": "lt", "Luxembourgish": "lb", "Macedonian": "mk", "Malagasy": "mg",
+        "Malay": "ms", "Malayalam": "ml", "Maltese": "mt", "Maori": "mi",
+        "Marathi": "mr", "Mongolian": "mn", "Myanmar": "my", "Nepali": "ne",
+        "Norwegian": "no", "Nyanja": "ny", "Pashto": "ps", "Persian": "fa",
+        "Polish": "pl", "Portuguese": "pt", "Punjabi": "pa", "Romanian": "ro",
+        "Russian": "ru", "Samoan": "sm", "Scots Gaelic": "gd", "Serbian": "sr",
+        "Sesotho": "st", "Shona": "sn", "Sindhi": "sd", "Sinhala": "si",
+        "Slovak": "sk", "Slovenian": "sl", "Somali": "so", "Spanish": "es",
+        "Sundanese": "su", "Swahili": "sw", "Swedish": "sv", "Tagalog": "tl",
+        "Tajik": "tg", "Tamil": "ta", "Telugu": "te", "Thai": "th",
+        "Turkish": "tr", "Ukrainian": "uk", "Urdu": "ur", "Uzbek": "uz",
+        "Vietnamese": "vi", "Welsh": "cy", "Xhosa": "xh", "Yiddish": "yi",
+        "Yoruba": "yo", "Zulu": "zu"
+    }
+    print(f"✅ Loaded {len(LANGUAGES)} languages (Google Translate)")
 
 # ---------------- TRANSLATE FUNCTION ----------------
+# ---------------- TRANSLATE FUNCTION ----------------
 async def translate(text: str, target: str) -> str | None:
-    try:
-        async with http_session.post(
-            f"{LIBRE_BASE}/translate",
-            json={
-                "q": text,
-                "source": "auto",
-                "target": target,
-                "format": "text"
-            },
-            timeout=aiohttp.ClientTimeout(total=20)
-        ) as r:
-            data = await r.json()
-            return data.get("translatedText")
-    except (asyncio.TimeoutError, aiohttp.ClientError):
+    """Translate text using Google Translate unofficial API"""
+    if not text or not text.strip():
         return None
-    except Exception:
+    
+    try:
+        # Google Translate unofficial endpoint
+        url = "https://translate.googleapis.com/translate_a/single"
+        params = {
+            "client": "gtx",
+            "sl": "auto",  # source language (auto-detect)
+            "tl": target,   # target language
+            "dt": "t",      # return translation
+            "q": text
+        }
+        
+        async with http_session.get(
+            url, 
+            params=params,
+            timeout=aiohttp.ClientTimeout(total=10)
+        ) as r:
+            if r.status != 200:
+                print(f"❌ Google API returned status {r.status}")
+                return None
+            
+            data = await r.json()
+            
+            # Parse the response - it's a nested array
+            if data and len(data) > 0 and data[0]:
+                translated_parts = []
+                for item in data[0]:
+                    if item and len(item) > 0 and item[0]:
+                        translated_parts.append(item[0])
+                
+                result = "".join(translated_parts)
+                if result:
+                    print(f"✅ Translation: {result[:100]}")
+                    return result
+            
+            return None
+    except Exception as e:
+        print(f"❌ Translation error: {e}")
         return None
 
 # ---------------- EMBED UI ----------------
@@ -145,32 +174,41 @@ async def on_ready():
 # ---------------- AUTO ENGLISH ----------------
 @bot.event
 async def on_message(message: discord.Message):
+    # Process commands first
+    await bot.process_commands(message)
+    
     # Ignore bot messages
     if message.author.bot:
-        await bot.process_commands(message)
         return
 
-    # Skip empty messages or messages without content
-    if not message.content or len(message.content.strip()) < 2:
-        await bot.process_commands(message)
+    # Skip empty messages or commands
+    if not message.content or len(message.content.strip()) < 2 or message.content.startswith('!') or message.content.startswith('/'):
         return
 
     # Skip if languages not loaded
     if not LANGUAGES:
-        await bot.process_commands(message)
+        print("⚠️ Languages not loaded, skipping translation")
         return
 
     # Translate to English
     try:
+        print(f"🔄 Attempting to translate: '{message.content[:50]}...'")
         translated = await translate(message.content, "en")
         
-        # Only reply if translation succeeded and is different from original
-        if translated and translated.lower().strip() != message.content.lower().strip():
+        if not translated:
+            print(f"❌ Translation failed or returned None")
+            return
+        
+        print(f"✅ Translation result: '{translated[:50]}...'")
+        
+        # Only reply if translation is different from original
+        if translated.lower().strip() != message.content.lower().strip():
             # Check if the difference is significant (not just punctuation)
-            original_words = message.content.lower().strip().replace(".", "").replace(",", "").replace("!", "").replace("?", "")
-            translated_words = translated.lower().strip().replace(".", "").replace(",", "").replace("!", "").replace("?", "")
+            original_words = message.content.lower().strip().replace(".", "").replace(",", "").replace("!", "").replace("?", "").replace("¿", "").replace("¡", "")
+            translated_words = translated.lower().strip().replace(".", "").replace(",", "").replace("!", "").replace("?", "").replace("¿", "").replace("¡", "")
             
             if original_words != translated_words:
+                print(f"📤 Sending translation reply")
                 await message.reply(
                     embed=translation_embed(
                         message.content,
@@ -180,10 +218,14 @@ async def on_message(message: discord.Message):
                     ),
                     mention_author=False
                 )
+            else:
+                print(f"⏭️ Skipping - only punctuation difference")
+        else:
+            print(f"⏭️ Skipping - already in English or no change")
     except Exception as e:
-        print(f"Translation error: {e}")
-    
-    await bot.process_commands(message)
+        print(f"❌ Translation error: {e}")
+        import traceback
+        traceback.print_exc()
 
 # ---------------- /TRANSLATE ----------------
 @bot.tree.command(name="translate", description="Translate replied message")
