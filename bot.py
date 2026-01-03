@@ -161,7 +161,7 @@ async def on_ready():
     http_session = aiohttp.ClientSession()
     
     print(f"🤖 Bot online as {bot.user}")
-    print(f"🔗 Connecting to LibreTranslate at: {LIBRE_BASE}")
+    print(f"🌐 Using Google Translate (unofficial API)")
     
     # Start health check server
     await start_health_server()
