@@ -145,16 +145,13 @@ async def translate(text: str, target: str) -> tuple[str, str] | None:
 
 # ---------------- EMBED UI ----------------
 def translation_embed(original, translated, source_lang, target_lang, author):
-    source_flag = get_flag(source_lang)
-    target_flag = get_flag(target_lang)
-    
     embed = discord.Embed(
-        title=f"{source_flag} {source_lang.upper()} → {target_flag} {target_lang.upper()}",
+        title=f"🌐 {source_lang.upper()} → {target_lang.upper()}",
         description=f"### {translated}",
         color=0xF1C40F  # Yellow border
     )
     embed.add_field(
-        name=f"{source_flag} Original",
+        name="📝 Original",
         value=f"```{original[:1000]}```",
         inline=False
     )
