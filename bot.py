@@ -92,8 +92,10 @@ async def load_languages():
 
 # ---------------- TRANSLATE FUNCTION ----------------
 # ---------------- TRANSLATE FUNCTION ----------------
-async def translate(text: str, target: str) -> str | None:
-    """Translate text using Google Translate unofficial API"""
+async def translate(text: str, target: str) -> tuple[str, str] | None:
+    """Translate text using Google Translate unofficial API
+    Returns: (translated_text, detected_source_language) or None
+    """
     if not text or not text.strip():
         return None
     
@@ -120,6 +122,7 @@ async def translate(text: str, target: str) -> str | None:
             data = await r.json()
             
             # Parse the response - it's a nested array
+            # data[0] contains translation, data[2] contains detected language
             if data and len(data) > 0 and data[0]:
                 translated_parts = []
                 for item in data[0]:
@@ -127,9 +130,13 @@ async def translate(text: str, target: str) -> str | None:
                         translated_parts.append(item[0])
                 
                 result = "".join(translated_parts)
+                
+                # Get detected source language (if available)
+                detected_lang = data[2] if len(data) > 2 else "auto"
+                
                 if result:
-                    print(f"✅ Translation: {result[:100]}")
-                    return result
+                    print(f"✅ Translation: {detected_lang} -> {target}: {result[:100]}")
+                    return (result, detected_lang)
             
             return None
     except Exception as e:
@@ -137,19 +144,22 @@ async def translate(text: str, target: str) -> str | None:
         return None
 
 # ---------------- EMBED UI ----------------
-def translation_embed(original, translated, language, author):
+def translation_embed(original, translated, source_lang, target_lang, author):
+    source_flag = get_flag(source_lang)
+    target_flag = get_flag(target_lang)
+    
     embed = discord.Embed(
-        title=f"🌐 iTranslator • {language}",
-        description=f"**{translated}**",
-        color=0xF1C40F
+        title=f"{source_flag} {source_lang.upper()} → {target_flag} {target_lang.upper()}",
+        description=f"### {translated}",
+        color=0xF1C40F  # Yellow border
     )
     embed.add_field(
-        name="📝 Original",
-        value=f"> {original[:1000]}",
+        name=f"{source_flag} Original",
+        value=f"```{original[:1000]}```",
         inline=False
     )
     embed.set_footer(
-        text=f"Requested by {author.display_name}",
+        text=f"Bot by {author.display_name}",
         icon_url=author.display_avatar.url
     )
     return embed
@@ -193,12 +203,13 @@ async def on_message(message: discord.Message):
     # Translate to English
     try:
         print(f"🔄 Attempting to translate: '{message.content[:50]}...'")
-        translated = await translate(message.content, "en")
+        result = await translate(message.content, "en")
         
-        if not translated:
+        if not result:
             print(f"❌ Translation failed or returned None")
             return
         
+        translated, source_lang = result
         print(f"✅ Translation result: '{translated[:50]}...'")
         
         # Only reply if translation is different from original
@@ -213,7 +224,8 @@ async def on_message(message: discord.Message):
                     embed=translation_embed(
                         message.content,
                         translated,
-                        "English",
+                        source_lang,
+                        "en",
                         message.author
                     ),
                     mention_author=False
