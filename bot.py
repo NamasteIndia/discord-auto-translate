@@ -145,30 +145,44 @@ async def on_ready():
 # ---------------- AUTO ENGLISH ----------------
 @bot.event
 async def on_message(message: discord.Message):
+    # Ignore bot messages
     if message.author.bot:
+        await bot.process_commands(message)
         return
 
+    # Skip empty messages or messages without content
+    if not message.content or len(message.content.strip()) < 2:
+        await bot.process_commands(message)
+        return
+
+    # Skip if languages not loaded
     if not LANGUAGES:
         await bot.process_commands(message)
         return
 
-    translated = await translate(message.content, "en")
-
-    if not translated:
-        await bot.process_commands(message)
-        return
-
-    if translated.lower().strip() != message.content.lower().strip():
-        await message.reply(
-            embed=translation_embed(
-                message.content,
-                translated,
-                "English",
-                message.author
-            ),
-            mention_author=False
-        )
-
+    # Translate to English
+    try:
+        translated = await translate(message.content, "en")
+        
+        # Only reply if translation succeeded and is different from original
+        if translated and translated.lower().strip() != message.content.lower().strip():
+            # Check if the difference is significant (not just punctuation)
+            original_words = message.content.lower().strip().replace(".", "").replace(",", "").replace("!", "").replace("?", "")
+            translated_words = translated.lower().strip().replace(".", "").replace(",", "").replace("!", "").replace("?", "")
+            
+            if original_words != translated_words:
+                await message.reply(
+                    embed=translation_embed(
+                        message.content,
+                        translated,
+                        "English",
+                        message.author
+                    ),
+                    mention_author=False
+                )
+    except Exception as e:
+        print(f"Translation error: {e}")
+    
     await bot.process_commands(message)
 
 # ---------------- /TRANSLATE ----------------
