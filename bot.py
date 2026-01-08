@@ -25,6 +25,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 LANGUAGES = {}
+COMMAND_ALIASES = {}
 http_session: aiohttp.ClientSession | None = None
 health_app = web.Application()
 
@@ -57,7 +58,7 @@ async def start_health_server():
 # ---------------- LOAD LANGUAGES ----------------
 async def load_languages():
     """Load supported languages for Google Translate"""
-    global LANGUAGES
+    global LANGUAGES, COMMAND_ALIASES
     
     # Google Translate supported languages
     LANGUAGES = {
@@ -88,6 +89,16 @@ async def load_languages():
         "Vietnamese": "vi", "Welsh": "cy", "Xhosa": "xh", "Yiddish": "yi",
         "Yoruba": "yo", "Zulu": "zu"
     }
+    
+    # Command aliases for common shortcuts
+    COMMAND_ALIASES = {
+        "vn": "vi",  # Vietnamese
+        "kr": "ko",  # Korean
+        "cn": "zh",  # Chinese
+        "jp": "ja",  # Japanese
+        "ua": "uk",  # Ukrainian
+    }
+    
     print(f"✅ Loaded {len(LANGUAGES)} languages (Google Translate)")
 
 # ---------------- TRANSLATE FUNCTION ----------------
@@ -201,9 +212,13 @@ async def on_message(message: discord.Message):
     if message.content and message.content.startswith('!') and message.reference:
         command = message.content.split()[0][1:].lower()  # Get command without '!'
         
-        # Check if command matches a language code
+        # Check if command matches a language code or alias
         lang_code = None
         target_lang_name = None
+        
+        # Check for command alias first (e.g., vn -> vi)
+        if command in COMMAND_ALIASES:
+            command = COMMAND_ALIASES[command]
         
         # Direct match with language code
         for lang_name, code in LANGUAGES.items():
@@ -362,6 +377,23 @@ async def languages_help(ctx):
         color=0x5865F2
     )
     
+    # Add popular shortcuts first
+    if COMMAND_ALIASES:
+        shortcuts = []
+        for alias, code in COMMAND_ALIASES.items():
+            # Find the language name
+            for name, lang_code in LANGUAGES.items():
+                if lang_code == code:
+                    shortcuts.append(f"`!{alias}` → {name}")
+                    break
+        
+        if shortcuts:
+            embed.add_field(
+                name="⭐ Popular Shortcuts",
+                value="\n".join(shortcuts),
+                inline=False
+            )
+    
     # Group languages for better readability
     lang_list = []
     for name, code in sorted(LANGUAGES.items()):
@@ -392,9 +424,16 @@ async def translate_prefix_cmd(ctx, lang: str = None):
     lang_code = None
     target_lang_name = None
     
-    # Check if it's a language code
+    # Normalize the language input
+    lang_lower = lang.lower()
+    
+    # Check for command alias first (e.g., vn -> vi)
+    if lang_lower in COMMAND_ALIASES:
+        lang_lower = COMMAND_ALIASES[lang_lower]
+    
+    # Check if it's a language code or name
     for lang_name, code in LANGUAGES.items():
-        if lang.lower() == code or lang.lower() == lang_name.lower():
+        if lang_lower == code or lang_lower == lang_name.lower():
             lang_code = code
             target_lang_name = lang_name
             break
