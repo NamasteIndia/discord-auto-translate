@@ -145,18 +145,30 @@ async def translate(text: str, target: str) -> tuple[str, str] | None:
 
 # ---------------- EMBED UI ----------------
 def translation_embed(original, translated, source_lang, target_lang, author):
+    """Create a compact and friendly translation embed"""
+    # Limit text length for cleaner display
+    MAX_ORIGINAL = 200
+    MAX_TRANSLATED = 500
+    
+    # Truncate if too long
+    display_original = original if len(original) <= MAX_ORIGINAL else original[:MAX_ORIGINAL] + "..."
+    display_translated = translated if len(translated) <= MAX_TRANSLATED else translated[:MAX_TRANSLATED] + "..."
+    
     embed = discord.Embed(
-        title=f"🌐 {source_lang.upper()} → {target_lang.upper()}",
-        description=f"### {translated}",
-        color=0xF1C40F  # Yellow border
+        description=f"**{display_translated}**",
+        color=0x5865F2  # Discord blurple
     )
-    embed.add_field(
-        name="📝 Original",
-        value=f"```{original[:1000]}```",
-        inline=False
-    )
+    
+    # Add original text if different and not too long
+    if display_original:
+        embed.add_field(
+            name=f"🔤 {source_lang.upper()} → {target_lang.upper()}",
+            value=display_original,
+            inline=False
+        )
+    
     embed.set_footer(
-        text=f"Bot by {author.display_name}",
+        text=f"Translated for {author.display_name}",
         icon_url=author.display_avatar.url
     )
     return embed
@@ -178,15 +190,65 @@ async def on_ready():
     
     print(f"✅ Bot ready!")
 
-# ---------------- AUTO ENGLISH ----------------
+# ---------------- MANUAL TRANSLATION COMMANDS ----------------
 @bot.event
 async def on_message(message: discord.Message):
-    # Process commands first
-    await bot.process_commands(message)
-    
     # Ignore bot messages
     if message.author.bot:
         return
+    
+    # Check for manual translation commands (e.g., !vn, !fr, !es)
+    if message.content and message.content.startswith('!') and message.reference:
+        command = message.content.split()[0][1:].lower()  # Get command without '!'
+        
+        # Check if command matches a language code
+        lang_code = None
+        target_lang_name = None
+        
+        # Direct match with language code
+        for lang_name, code in LANGUAGES.items():
+            if command == code:
+                lang_code = code
+                target_lang_name = lang_name
+                break
+        
+        if lang_code and target_lang_name:
+            try:
+                # Get the replied message
+                referenced_message = await message.channel.fetch_message(message.reference.message_id)
+                
+                if not referenced_message.content or not referenced_message.content.strip():
+                    await message.reply("⚠️ The message you replied to has no text to translate.", mention_author=False)
+                    return
+                
+                # Translate the message
+                result = await translate(referenced_message.content, lang_code)
+                
+                if not result:
+                    await message.reply("⚠️ Translation failed. Please try again.", mention_author=False)
+                    return
+                
+                translated, source_lang = result
+                
+                # Send translation
+                await message.reply(
+                    embed=translation_embed(
+                        referenced_message.content,
+                        translated,
+                        source_lang,
+                        target_lang_name,
+                        message.author
+                    ),
+                    mention_author=False
+                )
+                return
+            except Exception as e:
+                print(f"❌ Manual translation error: {e}")
+                await message.reply("⚠️ Error processing translation command.", mention_author=False)
+                return
+    
+    # Process other commands
+    await bot.process_commands(message)
 
     # Skip empty messages or commands
     if not message.content or len(message.content.strip()) < 2 or message.content.startswith('!') or message.content.startswith('/'):
@@ -289,6 +351,89 @@ async def language_autocomplete(interaction, current):
         for name in LANGUAGES
         if current.lower() in name.lower()
     ][:25]
+
+# ---------------- HELP COMMAND ----------------
+@bot.command(name='languages', aliases=['langs', 'help'])
+async def languages_help(ctx):
+    """Show all available language commands"""
+    embed = discord.Embed(
+        title="🌍 Available Translation Commands",
+        description="Reply to any message with these commands to translate it!",
+        color=0x5865F2
+    )
+    
+    # Group languages for better readability
+    lang_list = []
+    for name, code in sorted(LANGUAGES.items()):
+        lang_list.append(f"`!{code}` {name}")
+    
+    # Split into chunks of 25 for multiple fields
+    chunk_size = 25
+    for i in range(0, len(lang_list), chunk_size):
+        chunk = lang_list[i:i+chunk_size]
+        field_name = f"Languages ({i+1}-{min(i+chunk_size, len(lang_list))})"
+        embed.add_field(name=field_name, value="\n".join(chunk), inline=True)
+    
+    embed.set_footer(text="Example: Reply to a message with !vn to translate to Vietnamese")
+    await ctx.send(embed=embed)
+
+@bot.command(name='translate')
+async def translate_prefix_cmd(ctx, lang: str = None):
+    """Translate a replied message using prefix command"""
+    if not ctx.message.reference:
+        await ctx.reply("⚠️ Please reply to a message you want to translate!", mention_author=False)
+        return
+    
+    if not lang:
+        await ctx.reply("⚠️ Please specify a language code! Use `!languages` to see all codes.", mention_author=False)
+        return
+    
+    # Find the language
+    lang_code = None
+    target_lang_name = None
+    
+    # Check if it's a language code
+    for lang_name, code in LANGUAGES.items():
+        if lang.lower() == code or lang.lower() == lang_name.lower():
+            lang_code = code
+            target_lang_name = lang_name
+            break
+    
+    if not lang_code:
+        await ctx.reply(f"⚠️ Unknown language: `{lang}`. Use `!languages` to see all codes.", mention_author=False)
+        return
+    
+    try:
+        # Get the replied message
+        referenced_message = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+        
+        if not referenced_message.content or not referenced_message.content.strip():
+            await ctx.reply("⚠️ The message you replied to has no text to translate.", mention_author=False)
+            return
+        
+        # Translate the message
+        result = await translate(referenced_message.content, lang_code)
+        
+        if not result:
+            await ctx.reply("⚠️ Translation failed. Please try again.", mention_author=False)
+            return
+        
+        translated, source_lang = result
+        
+        # Send translation
+        await ctx.reply(
+            embed=translation_embed(
+                referenced_message.content,
+                translated,
+                source_lang,
+                target_lang_name,
+                ctx.author
+            ),
+            mention_author=False
+        )
+    except Exception as e:
+        print(f"❌ Translation error: {e}")
+        await ctx.reply("⚠️ Error processing translation.", mention_author=False)
 
 # ---------------- SHUTDOWN CLEANUP ----------------
 @bot.event
