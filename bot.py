@@ -26,6 +26,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 LANGUAGES = {}
 COMMAND_ALIASES = {}
+LANGUAGES_PER_FIELD = 25  # Number of languages to show per field in help command
 http_session: aiohttp.ClientSession | None = None
 health_app = web.Application()
 
@@ -170,8 +171,8 @@ def translation_embed(original, translated, source_lang, target_lang, author):
         color=0x5865F2  # Discord blurple
     )
     
-    # Add original text if different and not too long
-    if display_original:
+    # Add original text if it exists and is meaningful
+    if display_original and display_original.strip():
         embed.add_field(
             name=f"🔤 {source_lang.upper()} → {target_lang.upper()}",
             value=display_original,
@@ -210,7 +211,12 @@ async def on_message(message: discord.Message):
     
     # Check for manual translation commands (e.g., !vn, !fr, !es)
     if message.content and message.content.startswith('!') and message.reference:
-        command = message.content.split()[0][1:].lower()  # Get command without '!'
+        parts = message.content.split()
+        if not parts or len(parts[0]) <= 1:  # Handle edge cases
+            await bot.process_commands(message)
+            return
+        
+        command = parts[0][1:].lower()  # Get command without '!'
         
         # Check if command matches a language code or alias
         lang_code = None
@@ -265,7 +271,10 @@ async def on_message(message: discord.Message):
     # Process other commands
     await bot.process_commands(message)
 
-    # Skip empty messages or commands
+    # Skip processing for automatic translation if:
+    # - Empty messages or commands
+    # - Messages starting with ! or / (commands)
+    # - Very short messages
     if not message.content or len(message.content.strip()) < 2 or message.content.startswith('!') or message.content.startswith('/'):
         return
 
@@ -399,11 +408,10 @@ async def languages_help(ctx):
     for name, code in sorted(LANGUAGES.items()):
         lang_list.append(f"`!{code}` {name}")
     
-    # Split into chunks of 25 for multiple fields
-    chunk_size = 25
-    for i in range(0, len(lang_list), chunk_size):
-        chunk = lang_list[i:i+chunk_size]
-        field_name = f"Languages ({i+1}-{min(i+chunk_size, len(lang_list))})"
+    # Split into chunks for multiple fields
+    for i in range(0, len(lang_list), LANGUAGES_PER_FIELD):
+        chunk = lang_list[i:i+LANGUAGES_PER_FIELD]
+        field_name = f"Languages ({i+1}-{min(i+LANGUAGES_PER_FIELD, len(lang_list))})"
         embed.add_field(name=field_name, value="\n".join(chunk), inline=True)
     
     embed.set_footer(text="Example: Reply to a message with !vn to translate to Vietnamese")

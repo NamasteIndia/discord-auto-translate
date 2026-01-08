@@ -12,23 +12,28 @@ A Discord bot that automatically translates messages to English and provides man
 ### 💬 Manual Translation Commands
 Translate any message by replying to it with a language command!
 
-**Quick Commands:**
-- `!vn` - Translate to Vietnamese
-- `!es` - Translate to Spanish
-- `!fr` - Translate to French
-- `!de` - Translate to German
-- `!ja` - Translate to Japanese
-- `!ko` - Translate to Korean
-- `!zh` - Translate to Chinese
-- `!ru` - Translate to Russian
-- `!ar` - Translate to Arabic
-- `!hi` - Translate to Hindi
+**Popular Shortcuts:**
+- `!vn` - Translate to Vietnamese (alias for `!vi`)
+- `!jp` - Translate to Japanese (alias for `!ja`)
+- `!cn` - Translate to Chinese (alias for `!zh`)
+- `!kr` - Translate to Korean (alias for `!ko`)
+- `!ua` - Translate to Ukrainian (alias for `!uk`)
+
+**Direct Language Codes:**
+- `!es` - Spanish
+- `!fr` - French
+- `!de` - German
+- `!it` - Italian
+- `!pt` - Portuguese
+- `!ru` - Russian
+- `!ar` - Arabic
+- `!hi` - Hindi
 - And 80+ more languages!
 
 **How to use:**
-1. Reply to any message
-2. Type `!<language-code>` (e.g., `!vn` for Vietnamese)
-3. The bot will translate the message for you!
+1. Reply to any message you want to translate
+2. Type `!<language-code>` (e.g., `!vn` for Vietnamese or `!vi`)
+3. The bot will instantly translate the message for you!
 
 ### 📚 View All Languages
 - `!languages` or `!langs` or `!help` - Shows all available language commands
