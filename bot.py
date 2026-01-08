@@ -377,7 +377,7 @@ async def language_autocomplete(interaction, current):
     ][:25]
 
 # ---------------- HELP COMMAND ----------------
-@bot.command(name='languages', aliases=['langs', 'help'])
+@bot.command(name='languages', aliases=['langs', 'guide'])
 async def languages_help(ctx):
     """Show all available language commands"""
     embed = discord.Embed(

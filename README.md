@@ -36,7 +36,7 @@ Translate any message by replying to it with a language command!
 3. The bot will instantly translate the message for you!
 
 ### 📚 View All Languages
-- `!languages` or `!langs` or `!help` - Shows all available language commands
+- `!languages` or `!langs` or `!guide` - Shows all available language commands
 - `!translate <language-code>` - Alternative way to translate a replied message
 
 ### 🌐 Supported Languages (90+)
